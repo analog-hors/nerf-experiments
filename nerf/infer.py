@@ -52,8 +52,8 @@ def render_rays(
     rgb = torch.sigmoid(network_output[..., :3])
 
     dists = torch.cat((z_vals[..., 1:] - z_vals[..., :-1], torch.full_like(z_vals[..., :1], 1e10)), -1)
-    alpha = 1.0 - torch.exp(-sigma_a * dists)  
-    weights = alpha * nerf._util.exclusive_cumprod(1.0 - alpha + 1e-10, -1)
+    alpha = 1.0 - torch.exp(-sigma_a * dists)
+    weights = alpha * nerf._util.exclusive_cumprod(1.0 - alpha, -1)
     
     rgb_map = torch.sum(weights.unsqueeze(-1) * rgb, -2) 
 

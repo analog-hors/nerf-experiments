@@ -7,6 +7,13 @@ DEVICE = torch.device("cuda:0")
 ITERATIONS = 1000
 LOG_INTERVAL = 25
 
+NEAR = 2.0
+FAR = 6.0
+TRAINING_SAMPLES = 64
+
+SAMPLE_POSE = 0
+SAMPLE_SAMPLES = 64
+
 def load_numpy_dataset(path: str, device: torch.device) -> tuple[torch.Tensor, torch.Tensor, float]:
     data = np.load(path)
     images = torch.tensor(data["images"], device=device)
@@ -17,6 +24,8 @@ def load_numpy_dataset(path: str, device: torch.device) -> tuple[torch.Tensor, t
 images, poses, focal = load_numpy_dataset("datasets/tiny_nerf_data.npz", device=DEVICE)
 height, width = images.shape[1:3]
 
+rays_o, rays_d = nerf.infer.get_rays(height, width, focal, poses, device=DEVICE)
+
 model = nerf.model.Model(6, 8, 256, 4).to(DEVICE)
 optim = torch.optim.Adam(model.parameters(), lr = 0.0005)
 loss_fn = torch.nn.MSELoss()
@@ -26,13 +35,19 @@ running_start = time.time()
 running_loss = 0
 for iteration in range(ITERATIONS):
     index = np.random.randint(images.shape[0])
-    target = images[index]
-    pose = poses[index]
-    
-    rays_o, rays_d = nerf.infer.get_rays(height, width, focal, pose, device=DEVICE)
-    output = nerf.infer.render_rays(model, rays_o, rays_d, 2.0, 6.0, 64, randomize=True, device=DEVICE)
-    
-    loss = loss_fn(output, target)
+
+    output = nerf.infer.render_rays(
+        model,
+        rays_o[index],
+        rays_d[index],
+        NEAR,
+        FAR,
+        TRAINING_SAMPLES,
+        randomize=True,
+        device=DEVICE,
+    )
+
+    loss = loss_fn(output, images[index])
     optim.zero_grad()
     loss.backward()
     optim.step()
@@ -46,8 +61,22 @@ for iteration in range(ITERATIONS):
 
         model.eval()
         with torch.no_grad():
-            rays_o, rays_d = nerf.infer.get_rays(height, width, focal, poses[101], device=DEVICE)
-            output = nerf.infer.render_rays(model, rays_o, rays_d, 2.0, 6.0, 64, device=DEVICE)
+            sample_rays_o, sample_rays_d = nerf.infer.get_rays(
+                height,
+                width,
+                focal,
+                poses[SAMPLE_POSE],
+                device=DEVICE,
+            )
+            output = nerf.infer.render_rays(
+                model,
+                sample_rays_o,
+                sample_rays_d,
+                NEAR,
+                FAR,
+                SAMPLE_SAMPLES,
+                device=DEVICE,
+            )
             Image.frombytes("RGB", (width, height), (output.cpu() * 255).byte().numpy().tobytes()).save(f"inferred.png")
         model.train()
 

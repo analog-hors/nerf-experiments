@@ -7,6 +7,8 @@ def embed_points(points: torch.Tensor, freqs: int) -> torch.Tensor:
     return torch.cat((linear, torch.sin(angles), torch.cos(angles)), -1).flatten(-2)
 
 def get_rays(height: int, width: int, focal: float, c2w: torch.Tensor, device: torch.device = nerf._util.CPU):
+    assert len(c2w.shape) >= 2 and c2w.shape[-2:] == (4, 4)
+
     # Create y and x tensors of shape (height, width, 1)
     y, x = torch.meshgrid(
         torch.arange(height, device=device),
@@ -22,9 +24,13 @@ def get_rays(height: int, width: int, focal: float, c2w: torch.Tensor, device: t
     ))
     dirs /= torch.linalg.vector_norm(dirs, 2, -1).unsqueeze(-1)
 
+    # Add batch dimension for broadcasting if camera-to-world matrix is also batched
+    if len(c2w.shape) > 2:
+        dirs = dirs.unsqueeze(0)
+
     # Transform direction vectors using camera-to-world matrix
-    rays_d = torch.sum(dirs.unsqueeze(-2) * c2w[:3, :3], 3)
-    rays_o = torch.broadcast_to(c2w[:3, -1], rays_d.shape)
+    rays_d = torch.sum(dirs.unsqueeze(-2) * c2w[..., None, None, :3, :3], -1)
+    rays_o = torch.broadcast_to(c2w[..., None, None, :3, -1], rays_d.shape)
 
     return rays_o, rays_d
 

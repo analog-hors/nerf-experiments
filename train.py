@@ -10,6 +10,7 @@ LOG_INTERVAL = 25
 NEAR = 2.0
 FAR = 6.0
 TRAINING_SAMPLES = 64
+BATCH_SIZE = 1000
 
 SAMPLE_POSE = 0
 SAMPLE_SAMPLES = 64
@@ -34,12 +35,14 @@ model.train()
 running_start = time.time()
 running_loss = 0
 for iteration in range(ITERATIONS):
-    index = np.random.randint(images.shape[0])
+    batch_i = torch.randint(0, images.shape[0], (BATCH_SIZE,))
+    batch_y = torch.randint(0, images.shape[1], (BATCH_SIZE,))
+    batch_x = torch.randint(0, images.shape[2], (BATCH_SIZE,))
 
     output = nerf.infer.render_rays(
         model,
-        rays_o[index],
-        rays_d[index],
+        rays_o[batch_i, batch_y, batch_x],
+        rays_d[batch_i, batch_y, batch_x],
         NEAR,
         FAR,
         TRAINING_SAMPLES,
@@ -47,7 +50,7 @@ for iteration in range(ITERATIONS):
         device=DEVICE,
     )
 
-    loss = loss_fn(output, images[index])
+    loss = loss_fn(output, images[batch_i, batch_y, batch_x])
     optim.zero_grad()
     loss.backward()
     optim.step()

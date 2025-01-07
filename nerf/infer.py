@@ -47,12 +47,12 @@ def render_rays(
 
     z_vals = torch.linspace(near, far, samples, device=device)
     if randomize:
-        z_vals = z_vals + torch.rand((*rays_o.shape[:2], samples), device=device) * ((far - near) / samples)
+        z_vals = z_vals + torch.rand((*rays_o.shape[:-1], samples), device=device) * ((far - near) / samples)
     
-    points = rays_o.unsqueeze(2) + rays_d.unsqueeze(2) * z_vals.unsqueeze(-1)
+    points = rays_o.unsqueeze(-2) + rays_d.unsqueeze(-2) * z_vals.unsqueeze(-1)
     
     input_batch = embed_points(points.reshape((-1, 3)), 6)
-    network_output = nerf._util.chunked_inference(model, input_batch, 1024).reshape((*points.shape[:3], 4))
+    network_output = nerf._util.chunked_inference(model, input_batch, 1024).reshape((*points.shape[:-1], 4))
 
     sigma_a = torch.relu(network_output[..., 3])
     rgb = torch.sigmoid(network_output[..., :3])

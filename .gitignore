@@ -1,3 +1,6 @@
 /datasets/
 /stash/
+/models/
+/logs/
+/renders/
 __pycache__

@@ -1,38 +1,54 @@
-import torch
+import torch, torch.nn.functional as F
 
-def linear_with_xavier_uniform(in_features: int, out_features: int) -> torch.nn.Linear:
-    linear = torch.nn.Linear(in_features, out_features)
-    torch.nn.init.xavier_uniform_(linear.weight)
-    return linear
+_WIDTH = 256
+
+def _embed_point(point: torch.Tensor, freqs: int) -> torch.Tensor:
+    linear = point.unsqueeze(-1)
+    angles = linear * torch.exp2(torch.arange(freqs, device=point.device))
+    return torch.cat((linear, torch.sin(angles), torch.cos(angles)), -1).flatten(-2)
 
 class Model(torch.nn.Module):
-    layers: torch.nn.ModuleList
-    skip_interval: int
+    freqs: int
+    l0: torch.nn.Linear
+    l1: torch.nn.Linear
+    l2: torch.nn.Linear
+    l3: torch.nn.Linear
+    l4: torch.nn.Linear
+    l5: torch.nn.Linear
+    l6: torch.nn.Linear
+    l7: torch.nn.Linear
+    l8: torch.nn.Linear
 
-    def __init__(self, freqs: int, depth: int, width: int, skip_interval: int):
+    def __init__(self, freqs: int):
         super().__init__()
         
-        self.layers = torch.nn.ModuleList()
-        self.skip_interval = skip_interval
+        self.freqs = freqs
 
+        def linear(in_features: int, out_features: int) -> torch.nn.Linear:
+            layer = torch.nn.Linear(in_features, out_features)
+            torch.nn.init.xavier_uniform_(layer.weight)
+            return layer
+        
         input_width = 3 + 3 * 2 * freqs
-        prev_width = input_width
-        for i in range(depth):
-            if i != 1 and i % self.skip_interval == 1:
-                prev_width += input_width
-
-            self.layers.append(linear_with_xavier_uniform(prev_width, width))
-            prev_width = width
-
-        self.layers.append(linear_with_xavier_uniform(prev_width, 4))
+        self.l0 = linear(input_width, _WIDTH)
+        self.l1 = linear(_WIDTH, _WIDTH)
+        self.l2 = linear(_WIDTH, _WIDTH)
+        self.l3 = linear(_WIDTH, _WIDTH)
+        self.l4 = linear(_WIDTH, _WIDTH)
+        self.l5 = linear(_WIDTH + input_width, _WIDTH)
+        self.l6 = linear(_WIDTH, _WIDTH)
+        self.l7 = linear(_WIDTH, _WIDTH)
+        self.l8 = linear(_WIDTH, 3 + 1)
 
     def forward(self, point: torch.Tensor) -> torch.Tensor:
-        output = point
-        for i, layer in enumerate(self.layers):
-            if i != 1 and i % self.skip_interval == 1:
-                output = torch.cat((output, point), -1)
-            output = layer(output)
-            if i != len(self.layers) - 1:
-                output = torch.relu(output)
-
-        return output
+        input = _embed_point(point, self.freqs)
+        x = F.relu(self.l0(input))
+        x = F.relu(self.l1(x))
+        x = F.relu(self.l2(x))
+        x = F.relu(self.l3(x))
+        x = F.relu(self.l4(x))
+        x = F.relu(self.l5(torch.cat((x, input), -1)))
+        x = F.relu(self.l6(x))
+        x = F.relu(self.l7(x))
+        x = self.l8(x)
+        return x

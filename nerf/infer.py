@@ -1,11 +1,6 @@
 import torch
 import nerf._util
 
-def embed_points(points: torch.Tensor, freqs: int) -> torch.Tensor:
-    linear = points.unsqueeze(-1)
-    angles = linear * torch.exp2(torch.arange(freqs, device=points.device))
-    return torch.cat((linear, torch.sin(angles), torch.cos(angles)), -1).flatten(-2)
-
 def get_rays(height: int, width: int, focal: float, c2w: torch.Tensor, device: torch.device = nerf._util.CPU):
     assert len(c2w.shape) >= 2 and c2w.shape[-2:] == (4, 4)
 
@@ -51,7 +46,7 @@ def render_rays(
     
     points = rays_o.unsqueeze(-2) + rays_d.unsqueeze(-2) * z_vals.unsqueeze(-1)
     
-    input_batch = embed_points(points.reshape((-1, 3)), 6)
+    input_batch = points.reshape((-1, 3))
     network_output = nerf._util.chunked_inference(model, input_batch, 1024).reshape((*points.shape[:-1], 4))
 
     sigma_a = torch.relu(network_output[..., 3])

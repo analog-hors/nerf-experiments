@@ -27,7 +27,7 @@ height, width = images.shape[1:3]
 
 rays_o, rays_d = nerf.infer.get_rays(height, width, focal, poses, device=DEVICE)
 
-model = nerf.model.Model(6, 8, 256, 4).to(DEVICE)
+model = nerf.model.Model(6).to(DEVICE)
 optim = torch.optim.Adam(model.parameters(), lr = 0.0005)
 loss_fn = torch.nn.MSELoss()
 

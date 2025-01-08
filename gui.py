@@ -13,7 +13,7 @@ HEIGHT = 100
 MODEL_PATH = "model_10k.bin"
 DEVICE = torch.device("cuda:0")
 
-model = nerf.model.Model(6, 8, 256, 4).to(DEVICE)
+model = nerf.model.Model(6).to(DEVICE)
 model.load_state_dict(torch.load(MODEL_PATH, weights_only=True))
 model.eval()
 

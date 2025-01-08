@@ -1,4 +1,4 @@
-import torch, torch.nn.functional as F
+import torch, torch.nn.functional as F, numpy as np
 
 _WIDTH = 256
 
@@ -52,3 +52,14 @@ class Model(torch.nn.Module):
         x = F.relu(self.l7(x))
         x = self.l8(x)
         return x
+
+def save(model: Model, path: str):
+    state = { k: v.cpu().numpy() for k, v in model.state_dict().items() }
+    with open(path, "wb+") as output:
+        np.savez_compressed(output, freqs=model.freqs, **state)
+
+def load(path: str) -> Model:
+    state = { k: torch.tensor(v) for k, v in np.load(path, allow_pickle=False).items() }
+    model = Model(int(state.pop("freqs")))
+    model.load_state_dict(state)
+    return model

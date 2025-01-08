@@ -86,4 +86,4 @@ for iteration in range(ITERATIONS):
         running_start = now
         running_loss = 0
 
-torch.save(model.state_dict(), "model.bin")
+nerf.model.save(model, "model.bin")

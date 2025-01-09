@@ -39,14 +39,18 @@ for iteration in range(ITERATIONS):
     batch_y = torch.randint(0, images.shape[1], (BATCH_SIZE,))
     batch_x = torch.randint(0, images.shape[2], (BATCH_SIZE,))
 
+    t_vals = nerf.infer.stratified_samples(
+        NEAR,
+        FAR,
+        TRAINING_SAMPLES,
+        (BATCH_SIZE,),
+        device=DEVICE,
+    )
     output = nerf.infer.render_rays(
         model,
         rays_o[batch_i, batch_y, batch_x],
         rays_d[batch_i, batch_y, batch_x],
-        NEAR,
-        FAR,
-        TRAINING_SAMPLES,
-        randomize=True,
+        t_vals,
         device=DEVICE,
     )
 
@@ -75,9 +79,7 @@ for iteration in range(ITERATIONS):
                 model,
                 sample_rays_o,
                 sample_rays_d,
-                NEAR,
-                FAR,
-                SAMPLE_SAMPLES,
+                torch.linspace(NEAR, FAR, SAMPLE_SAMPLES, device=DEVICE),
                 device=DEVICE,
             )
             Image.frombytes("RGB", (width, height), (output.cpu() * 255).byte().numpy().tobytes()).save(f"inferred.png")

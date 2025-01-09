@@ -29,33 +29,40 @@ def get_rays(height: int, width: int, focal: float, c2w: torch.Tensor, device: t
 
     return rays_o, rays_d
 
+def stratified_samples(
+    near: float,
+    far: float,
+    samples: int,
+    batch_dims: tuple[int, ...],
+    device: torch.device = nerf._util.CPU,
+):
+    t_vals = torch.rand((*batch_dims, samples), device=device) * ((far - near) / samples)
+    t_vals += torch.linspace(near, far, samples, device=device)
+    return t_vals
+
 def render_rays(
     model: torch.nn.Module,
     rays_o: torch.Tensor,
     rays_d: torch.Tensor,
-    near: float,
-    far: float,
-    samples: int,
-    randomize: bool = False,
+    t_vals: torch.Tensor,
     device: torch.device = nerf._util.CPU,
 ) -> torch.Tensor:
 
-    z_vals = torch.linspace(near, far, samples, device=device)
-    if randomize:
-        z_vals = z_vals + torch.rand((*rays_o.shape[:-1], samples), device=device) * ((far - near) / samples)
-    
-    points = rays_o.unsqueeze(-2) + rays_d.unsqueeze(-2) * z_vals.unsqueeze(-1)
-    
+    # Compute sample points and query model at each point
+    points = rays_o.unsqueeze(-2) + rays_d.unsqueeze(-2) * t_vals.unsqueeze(-1)
     input_batch = points.reshape((-1, 3))
     network_output = nerf._util.chunked_inference(model, input_batch, 1024).reshape((*points.shape[:-1], 4))
 
-    sigma_a = torch.relu(network_output[..., 3])
+    # Extract and process density and rgb outputs
+    density = torch.relu(network_output[..., 3])
     rgb = torch.sigmoid(network_output[..., :3])
 
-    dists = torch.cat((z_vals[..., 1:] - z_vals[..., :-1], torch.full_like(z_vals[..., :1], 1e10)), -1)
-    alpha = 1.0 - torch.exp(-sigma_a * dists)
+    # Do volume rendering to produce weights
+    dists = torch.cat((t_vals[..., 1:] - t_vals[..., :-1], torch.full_like(t_vals[..., :1], 1e10)), -1)
+    alpha = 1.0 - torch.exp(-density * dists)
     weights = alpha * nerf._util.exclusive_cumprod(1.0 - alpha, -1)
     
+    # Apply weights to rgb to produce final colors
     rgb_map = torch.sum(weights.unsqueeze(-1) * rgb, -2) 
 
     return rgb_map

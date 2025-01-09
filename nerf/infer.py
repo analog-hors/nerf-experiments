@@ -1,8 +1,9 @@
 import torch
 import nerf._util
 
-def get_rays(height: int, width: int, focal: float, c2w: torch.Tensor, device: torch.device = nerf._util.CPU):
+def get_rays(height: int, width: int, focal: float, c2w: torch.Tensor):
     assert len(c2w.shape) >= 2 and c2w.shape[-2:] == (4, 4)
+    device = nerf._util.get_device_if_same(c2w)
 
     # Create y and x tensors of shape (height, width, 1)
     y, x = torch.meshgrid(
@@ -15,7 +16,7 @@ def get_rays(height: int, width: int, focal: float, c2w: torch.Tensor, device: t
     dirs = torch.dstack((
         (x - width / 2) / focal,
         -(y - height / 2) / focal,
-        -torch.ones_like(x, device=device),
+        -torch.ones_like(x),
     ))
     dirs /= torch.linalg.vector_norm(dirs, 2, -1).unsqueeze(-1)
 
@@ -45,8 +46,11 @@ def render_rays(
     rays_o: torch.Tensor,
     rays_d: torch.Tensor,
     t_vals: torch.Tensor,
-    device: torch.device = nerf._util.CPU,
 ) -> torch.Tensor:
+    assert len(rays_o.shape) >= 1 and rays_o.shape[-1] == 3
+    assert rays_d.shape == rays_o.shape
+    assert nerf._util.can_broadcast(t_vals.shape[:-1], rays_o.shape[:-1])
+    _device = nerf._util.get_device_if_same(rays_o, rays_d, t_vals)
 
     # Compute sample points and query model at each point
     points = rays_o.unsqueeze(-2) + rays_d.unsqueeze(-2) * t_vals.unsqueeze(-1)

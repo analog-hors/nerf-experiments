@@ -47,9 +47,9 @@ def update_plot(image: AxesImage, sliders: list[float]):
     theta, pi, radius, focal, near, far, samples = sliders
     with torch.no_grad():
         pose = pose_spherical(theta, pi, radius).to(DEVICE)
-        rays_o, rays_d = nerf.infer.get_rays(HEIGHT, WIDTH, focal, pose, device=DEVICE)
+        rays_o, rays_d = nerf.infer.get_rays(HEIGHT, WIDTH, focal, pose)
         t_vals = nerf.infer.stratified_samples(near, far, int(samples), (HEIGHT, WIDTH,), device=DEVICE)
-        output = nerf.infer.render_rays(model, rays_o, rays_d, t_vals, device=DEVICE)
+        output = nerf.infer.render_rays(model, rays_o, rays_d, t_vals)
 
     image.set_data(output.cpu())
 

@@ -2,6 +2,17 @@ import torch
 
 CPU = torch.device("cpu")
 
+def get_device_if_same(first: torch.Tensor, *rest: torch.Tensor):
+    assert all(tensor.device == first.device for tensor in rest)
+    return first.device
+
+def can_broadcast(*shapes: torch.Size):
+    try:
+        torch.broadcast_shapes(*shapes)
+        return True
+    except RuntimeError:
+        return False
+
 def exclusive_cumprod(input: torch.Tensor, dim: int) -> torch.Tensor:
     assert dim in range(-len(input.shape) + 1, len(input.shape))
     dim = dim if dim >= 0 else dim + len(input.shape)

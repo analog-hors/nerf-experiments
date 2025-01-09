@@ -25,7 +25,7 @@ def load_numpy_dataset(path: str, device: torch.device) -> tuple[torch.Tensor, t
 images, poses, focal = load_numpy_dataset("datasets/tiny_nerf_data.npz", device=DEVICE)
 height, width = images.shape[1:3]
 
-rays_o, rays_d = nerf.infer.get_rays(height, width, focal, poses, device=DEVICE)
+rays_o, rays_d = nerf.infer.get_rays(height, width, focal, poses)
 
 model = nerf.model.Model(6).to(DEVICE)
 optim = torch.optim.Adam(model.parameters(), lr = 0.0005)
@@ -51,7 +51,6 @@ for iteration in range(ITERATIONS):
         rays_o[batch_i, batch_y, batch_x],
         rays_d[batch_i, batch_y, batch_x],
         t_vals,
-        device=DEVICE,
     )
 
     loss = loss_fn(output, images[batch_i, batch_y, batch_x])
@@ -73,14 +72,12 @@ for iteration in range(ITERATIONS):
                 width,
                 focal,
                 poses[SAMPLE_POSE],
-                device=DEVICE,
             )
             output = nerf.infer.render_rays(
                 model,
                 sample_rays_o,
                 sample_rays_d,
                 torch.linspace(NEAR, FAR, SAMPLE_SAMPLES, device=DEVICE),
-                device=DEVICE,
             )
             Image.frombytes("RGB", (width, height), (output.cpu() * 255).byte().numpy().tobytes()).save(f"inferred.png")
         model.train()

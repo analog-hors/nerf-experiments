@@ -4,16 +4,16 @@ import nerf.model, nerf.infer
 from PIL import Image
 
 DEVICE = torch.device("cuda:0")
-ITERATIONS = 1000
+ITERATIONS = 10_000
 LOG_INTERVAL = 25
 
-NEAR = 2.0
-FAR = 6.0
+NEAR = 5.0
+FAR = 11.0
 TRAINING_SAMPLES = 64
 BATCH_SIZE = 1000
 
-SAMPLE_SCALE = 1
-SAMPLE_POSE = 0
+SAMPLE_SCALE = 0.1
+SAMPLE_POSE = 50
 SAMPLE_SAMPLES = 64
 
 def load_numpy_dataset(path: str, device: torch.device) -> tuple[torch.Tensor, torch.Tensor, float]:
@@ -23,7 +23,7 @@ def load_numpy_dataset(path: str, device: torch.device) -> tuple[torch.Tensor, t
     focal = float(data["focal"])
     return images, poses, focal
 
-images, poses, focal = load_numpy_dataset("datasets/tiny_nerf_data.npz", device=DEVICE)
+images, poses, focal = load_numpy_dataset("datasets/horse1k.npz", device=DEVICE)
 height, width = images.shape[1:3]
 
 model = nerf.model.Model(6).to(DEVICE)

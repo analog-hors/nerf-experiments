@@ -12,6 +12,7 @@ FAR = 6.0
 TRAINING_SAMPLES = 64
 BATCH_SIZE = 1000
 
+SAMPLE_SCALE = 1
 SAMPLE_POSE = 0
 SAMPLE_SAMPLES = 64
 
@@ -73,26 +74,30 @@ for iteration in range(ITERATIONS):
 
         model.eval()
         with torch.no_grad():
+            sample_width = int(width * SAMPLE_SCALE)
+            sample_height = int(height * SAMPLE_SCALE)
+            sample_focal = focal * SAMPLE_SCALE
             sample_x, sample_y = torch.meshgrid(
-                torch.arange(width, device=DEVICE),
-                torch.arange(height, device=DEVICE),
+                torch.arange(sample_width, device=DEVICE),
+                torch.arange(sample_height, device=DEVICE),
                 indexing="xy",
             )
             sample_rays_o, sample_rays_d = nerf.infer.get_rays(
                 sample_x,
                 sample_y,
-                width,
-                height,
-                focal,
+                sample_width,
+                sample_height,
+                sample_focal,
                 poses[SAMPLE_POSE],
             )
-            sample = nerf.infer.render_rays(
+            sample_output = nerf.infer.render_rays(
                 model,
                 sample_rays_o,
                 sample_rays_d,
                 torch.linspace(NEAR, FAR, SAMPLE_SAMPLES, device=DEVICE),
             )
-            Image.frombytes("RGB", (width, height), (sample.cpu() * 255).byte().numpy().tobytes()).save(f"inferred.png")
+            sample_image_data = (sample_output.cpu() * 255).byte().numpy().tobytes()
+            Image.frombytes("RGB", (sample_width, sample_height), sample_image_data).save(f"inferred.png")
         model.train()
 
         running_start = now

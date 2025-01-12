@@ -25,8 +25,6 @@ def load_numpy_dataset(path: str, device: torch.device) -> tuple[torch.Tensor, t
 images, poses, focal = load_numpy_dataset("datasets/tiny_nerf_data.npz", device=DEVICE)
 height, width = images.shape[1:3]
 
-rays_o, rays_d = nerf.infer.get_rays(height, width, focal, poses)
-
 model = nerf.model.Model(6).to(DEVICE)
 optim = torch.optim.Adam(model.parameters(), lr = 0.0005)
 loss_fn = torch.nn.MSELoss()
@@ -35,10 +33,18 @@ model.train()
 running_start = time.time()
 running_loss = 0
 for iteration in range(ITERATIONS):
-    batch_i = torch.randint(0, images.shape[0], (BATCH_SIZE,))
-    batch_y = torch.randint(0, images.shape[1], (BATCH_SIZE,))
-    batch_x = torch.randint(0, images.shape[2], (BATCH_SIZE,))
+    batch_i = torch.randint(0, images.shape[0], (BATCH_SIZE,), device=DEVICE)
+    batch_y = torch.randint(0, images.shape[1], (BATCH_SIZE,), device=DEVICE)
+    batch_x = torch.randint(0, images.shape[2], (BATCH_SIZE,), device=DEVICE)
 
+    rays_o, rays_d = nerf.infer.get_rays(
+        batch_x,
+        batch_y,
+        width,
+        height,
+        focal,
+        poses[batch_i],
+    )
     t_vals = nerf.infer.stratified_samples(
         NEAR,
         FAR,
@@ -48,8 +54,8 @@ for iteration in range(ITERATIONS):
     )
     output = nerf.infer.render_rays(
         model,
-        rays_o[batch_i, batch_y, batch_x],
-        rays_d[batch_i, batch_y, batch_x],
+        rays_o,
+        rays_d,
         t_vals,
     )
 
@@ -67,19 +73,26 @@ for iteration in range(ITERATIONS):
 
         model.eval()
         with torch.no_grad():
+            sample_x, sample_y = torch.meshgrid(
+                torch.arange(width, device=DEVICE),
+                torch.arange(height, device=DEVICE),
+                indexing="xy",
+            )
             sample_rays_o, sample_rays_d = nerf.infer.get_rays(
-                height,
+                sample_x,
+                sample_y,
                 width,
+                height,
                 focal,
                 poses[SAMPLE_POSE],
             )
-            output = nerf.infer.render_rays(
+            sample = nerf.infer.render_rays(
                 model,
                 sample_rays_o,
                 sample_rays_d,
                 torch.linspace(NEAR, FAR, SAMPLE_SAMPLES, device=DEVICE),
             )
-            Image.frombytes("RGB", (width, height), (output.cpu() * 255).byte().numpy().tobytes()).save(f"inferred.png")
+            Image.frombytes("RGB", (width, height), (sample.cpu() * 255).byte().numpy().tobytes()).save(f"inferred.png")
         model.train()
 
         running_start = now

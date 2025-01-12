@@ -1,32 +1,30 @@
 import torch
 import nerf._util
 
-def get_rays(height: int, width: int, focal: float, c2w: torch.Tensor):
+def get_rays(
+    x: torch.Tensor,
+    y: torch.Tensor,
+    width: int,
+    height: int,
+    focal: float,
+    c2w: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    assert x.shape == y.shape
     assert len(c2w.shape) >= 2 and c2w.shape[-2:] == (4, 4)
-    device = nerf._util.get_device_if_same(c2w)
+    assert nerf._util.can_broadcast(x.shape[:-1], c2w.shape[:-2])
+    _device = nerf._util.get_device_if_same(y, x, c2w)
 
-    # Create y and x tensors of shape (height, width, 1)
-    y, x = torch.meshgrid(
-        torch.arange(height, device=device),
-        torch.arange(width, device=device),
-        indexing="ij",
-    )
-
-    # Create camera-relative direction vectors with shape (height, width, 3)
-    dirs = torch.dstack((
+    # Create camera-relative direction vectors with shape (..., 3)
+    dirs = torch.stack((
         (x - width / 2) / focal,
         -(y - height / 2) / focal,
         -torch.ones_like(x),
-    ))
+    ), -1)
     dirs /= torch.linalg.vector_norm(dirs, 2, -1).unsqueeze(-1)
 
-    # Add batch dimension for broadcasting if camera-to-world matrix is also batched
-    if len(c2w.shape) > 2:
-        dirs = dirs.unsqueeze(0)
-
     # Transform direction vectors using camera-to-world matrix
-    rays_d = torch.sum(dirs.unsqueeze(-2) * c2w[..., None, None, :3, :3], -1)
-    rays_o = torch.broadcast_to(c2w[..., None, None, :3, -1], rays_d.shape)
+    rays_d = torch.sum(dirs[..., None, :] * c2w[..., :3, :3], -1)
+    rays_o = torch.broadcast_to(c2w[..., :3, -1], rays_d.shape)
 
     return rays_o, rays_d
 

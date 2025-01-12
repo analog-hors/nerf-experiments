@@ -10,7 +10,7 @@ from typing import Callable
 WIDTH = 100
 HEIGHT = 100
 
-MODEL_PATH = "model_10k.bin"
+MODEL_PATH = "model.bin"
 DEVICE = torch.device("cuda:0")
 
 model = nerf.model.load(MODEL_PATH).to(DEVICE)
@@ -47,7 +47,12 @@ def update_plot(image: AxesImage, sliders: list[float]):
     theta, pi, radius, focal, near, far, samples = sliders
     with torch.no_grad():
         pose = pose_spherical(theta, pi, radius).to(DEVICE)
-        rays_o, rays_d = nerf.infer.get_rays(HEIGHT, WIDTH, focal, pose)
+        x, y = torch.meshgrid(
+            torch.arange(WIDTH, device=DEVICE),
+            torch.arange(HEIGHT, device=DEVICE),
+            indexing="xy",
+        )
+        rays_o, rays_d = nerf.infer.get_rays(x, y, WIDTH, HEIGHT, focal, pose)
         t_vals = nerf.infer.stratified_samples(near, far, int(samples), (HEIGHT, WIDTH,), device=DEVICE)
         output = nerf.infer.render_rays(model, rays_o, rays_d, t_vals)
 
